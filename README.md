@@ -59,6 +59,8 @@ contractdock scenario scenario.json --port 8099
 
 ## 后续里程碑
 
+可复现回放/场景并发基准：`python -m benchmarks.replay --requests 256 --workers 4`。它校验所有HTTP响应及场景响应数量，不将错误请求计为吞吐；实测与冷启动/顺序/内存测量限制见 [方法说明](benchmarks/README.md)。不是生产负载或场景比固定回放更快的证明。
+
 1. OpenAPI导入、optional/union schema和请求响应双向兼容定义。
 2. 可配置字段脱敏、fixture隐私审计和审批。
 3. 显式本地代理录制，安全受控header输入（绝不落盘）。
