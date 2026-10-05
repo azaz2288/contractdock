@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "contractdock"
+version = "0.1.0"
+description = "Redacted JSON HTTP fixtures, offline replay, and observed schema drift checks"
+requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "azaz2288"}]
+dependencies = []
+[project.scripts]
+contractdock = "contractdock.__main__:main"
+[tool.setuptools.packages.find]
+include = ["contractdock*"]

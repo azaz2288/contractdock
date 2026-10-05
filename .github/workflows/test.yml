@@ -1,0 +1,27 @@
+name: tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -v
+      - run: python examples/demo.py
+      - run: python -m compileall -q contractdock tests examples
+      - run: python -m pip wheel --no-deps --wheel-dir dist .
+      - name: Installed CLI
+        shell: bash
+        run: |
+          python -m pip install --no-deps dist/*.whl
+          cd "$RUNNER_TEMP"
+          contractdock --help
+          python -c "import contractdock; assert 'site-packages' in contractdock.__file__"
