@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 from .core import ContractError, compare, load_fixture, parse_json, record, replay_server, write_fixture
+from .scenario import load_scenario, scenario_server
 
 
 def main(argv=None):
@@ -20,6 +21,9 @@ def main(argv=None):
     command = sub.add_parser("replay")
     command.add_argument("fixtures", type=Path, nargs="+")
     command.add_argument("--port", type=int, default=8099)
+    command = sub.add_parser("scenario", help="Serve a globally ordered offline response sequence")
+    command.add_argument("description", type=Path)
+    command.add_argument("--port", type=int, default=8099)
     args = parser.parse_args(argv)
     try:
         if args.action == "record":
@@ -35,8 +39,11 @@ def main(argv=None):
             report = compare(load_fixture(args.before), load_fixture(args.after))
             print(json.dumps(report))
             return 0 if report["passed"] else 1
-        with replay_server([load_fixture(path) for path in args.fixtures], port=args.port) as server:
-            print(json.dumps({"replay_url": f"http://127.0.0.1:{server.server_port}", "offline": True}), flush=True)
+        server = (scenario_server(load_scenario(args.description), port=args.port) if args.action == 'scenario'
+                  else replay_server([load_fixture(path) for path in args.fixtures], port=args.port))
+        with server:
+            print(json.dumps({"replay_url": f"http://127.0.0.1:{server.server_port}", "offline": True,
+                              "mode": args.action}), flush=True)
             try:
                 server.serve_forever()
             except KeyboardInterrupt:

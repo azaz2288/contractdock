@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -8,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -267,12 +269,23 @@ def replay_server(packets, *, port=0):
     fixtures = {}
     for packet in packets:
         validate(packet)
+        packet = copy.deepcopy(packet)
         key = packet["request"]["key"]
         if key in fixtures:
             raise ContractError("Duplicate replay request; choose one fixture per request")
         fixtures[key] = packet
     if not fixtures:
         raise ContractError("Replay requires a fixture")
+    def select(key):
+        packet = fixtures.get(key)
+        if packet is None:
+            return 404, {"error": "unrecorded request"}, 0
+        return packet['response']['status'], packet['response']['body'], 0
+    return _replay_server(select, port=port)
+
+
+def _replay_server(select, *, port=0):
+    """Shared loopback transport; selectors never fall through to a network."""
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass  # Requests/query strings may contain secrets.
@@ -289,7 +302,7 @@ def replay_server(packets, *, port=0):
                 if self.headers.get("Transfer-Encoding"):
                     raise ContractError("Streaming requests unsupported")
                 lengths = self.headers.get_all("Content-Length") or ["0"]
-                if len(lengths) != 1 or not lengths[0].isdigit():
+                if len(lengths) != 1 or len(lengths[0]) > 10 or not lengths[0].isascii() or not lengths[0].isdigit():
                     raise ContractError("Invalid Content-Length")
                 length = int(lengths[0])
                 if length > MAX_BYTES:
@@ -300,11 +313,10 @@ def replay_server(packets, *, port=0):
                     raise ContractError("Incomplete request")
                 body = parse_json(raw) if raw else None
                 key = request_key(self.command, self.path, body)["key"]
-                packet = fixtures.get(key)
-                if packet is None:
-                    self.send_json(404, {"error": "unrecorded request"})
-                else:
-                    self.send_json(packet["response"]["status"], packet["response"]["body"])
+                status, value, delay_ms = select(key)
+                if delay_ms:
+                    time.sleep(delay_ms / 1000)
+                self.send_json(status, value)
             except (ContractError, OSError):
                 try:
                     self.send_json(400, {"error": "invalid request"})

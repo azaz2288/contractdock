@@ -28,14 +28,41 @@ contractdock --help
 
 v0.2对数组的每个新观察形状检查至少一个兼容的旧形状，不能因旧数组有多个object类型而跳过字段验证。空数组对非空数组会输出`uncertainties`和`compatible: null`，不能把没有证据当成兼容证明；`passed`只表示没有已发现的漂移，`compatible`也只针对本次观察样例，仍不是整个API的保证。
 
-仅支持UTF-8有限JSON、GET/POST。无WebSocket/SSE/文件流/HLS、认证header注入、session状态机或CORS开发服务器。显式origin allowlist不是DNS-rebinding/SSRF安全沙箱：仅对可信URL使用，不暴露给远程提交任意URL的用户。HTTP回放是本地开发服务，不是生产服务器，连接并发/内存资源需OS隔离。
+仅支持UTF-8有限JSON、GET/POST。无WebSocket/SSE/文件流/HLS、认证header注入、每用户session状态机或CORS开发服务器。显式origin allowlist不是DNS-rebinding/SSRF安全沙箱：仅对可信URL使用，不暴露给远程提交任意URL的用户。HTTP回放是本地开发服务，不是生产服务器，连接并发/内存资源需OS隔离。
+
+## v0.3 顺序场景：测试重试、恢复与多步骤客户端
+
+固定 `replay` 模式仍按请求返回同一fixture。新 `scenario` 模式使用一个**全局共享**顺序，适合单个受控客户端测试，不是每用户独立session：
+
+```sh
+python examples/retry_scenario.py
+contractdock scenario scenario.json --port 8099
+```
+
+`scenario.json` 是显式读取的JSON，无自动网络录制或工程策略加载：
+
+```json
+{
+  "version": 1,
+  "steps": [
+    {"fixture": "此处放完整且校验通过的503 fixture对象，非文件路径", "repeat": 2, "delay_ms": 100},
+    {"fixture": "此处放相同请求的完整200 fixture对象", "repeat": 1}
+  ]
+}
+```
+
+上面仅展示结构，字符串占位符不可执行；示例脚本生成完整可验证描述。Python API为 `scenario_server(description, port=0)`，与 `replay_server` 一样返回需关闭的本地HTTP server。每步只能包含 `fixture` 和可选 `repeat` / `delay_ms`；1至100步，累计不超过10,000响应，repeat严格整数1至10,000，delay_ms严格整数0至5,000（bool拒绝），完整描述最多1MiB。启动前验证所有fixture的校验/脱敏/schema，并复制内部状态，外部字典后续变动不会改变服务响应。
+
+仅匹配当前步骤的规范method/path/query/脱敏body才能消耗一次repeat，重复次数用尽后推进；错序或未知请求返回409，非法JSON/长度头返回400，都不推进。全步骤结束返回410，不自动循环、不回退网络。多个并发请求按服务器锁内**匹配预留顺序**消耗；响应实际到达可因延迟乱序。匹配后即消耗，即使客户端断开；延迟在锁外执行，不阻塞后续步骤。服务重启从头开始，无持久场景状态；延迟是调度请求，不是硬实时精度保证。
+
+示例完全使用合成脱敏fixtures，实际通过本地HTTP请求观察 `[503,503,200]` 重试恢复、错序409和结束410。适合可重复测试“暂时不可用→恢复”，不意味着真实后端故障统计或生产负载模型。现有固定回放同样复制已验证fixture，避免调用者在启动后改响应绕过完整性检查。
 
 ## 后续里程碑
 
 1. OpenAPI导入、optional/union schema和请求响应双向兼容定义。
 2. 可配置字段脱敏、fixture隐私审计和审批。
 3. 显式本地代理录制，安全受控header输入（绝不落盘）。
-4. 多步骤session状态机、分页/故障/延时模拟和确定性匹配。
+4. 在全局顺序场景基础上增加显式每用户session、分支/分页和受控断连模拟。
 5. 大型fixture、并发/断连测量、桌面审阅和签名发布。
 
 新作品集工程，不宣称符合飞书活动的原有私有仓库准入。
