@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "contractdock"
-version = "0.1.0"
+version = "0.2.0"
 description = "Redacted JSON HTTP fixtures, offline replay, and observed schema drift checks"
 requires-python = ">=3.12"
 readme = "README.md"

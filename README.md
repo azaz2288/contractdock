@@ -26,6 +26,8 @@ contractdock --help
 
 比较是单样例的观察schema漂移检查，不是OpenAPI完整兼容性证明。新增对象字段可通过，旧字段消失/类型变化/状态变化会失败；数组从无元素样例无法推断类型，多对象变体也不等同完整schema；值范围、枚举、业务语义、optional字段、认证、分页和时序不被证明。样例不同本身可能产生误报，应挑选同请求同场景样例。
 
+v0.2对数组的每个新观察形状检查至少一个兼容的旧形状，不能因旧数组有多个object类型而跳过字段验证。空数组对非空数组会输出`uncertainties`和`compatible: null`，不能把没有证据当成兼容证明；`passed`只表示没有已发现的漂移，`compatible`也只针对本次观察样例，仍不是整个API的保证。
+
 仅支持UTF-8有限JSON、GET/POST。无WebSocket/SSE/文件流/HLS、认证header注入、session状态机或CORS开发服务器。显式origin allowlist不是DNS-rebinding/SSRF安全沙箱：仅对可信URL使用，不暴露给远程提交任意URL的用户。HTTP回放是本地开发服务，不是生产服务器，连接并发/内存资源需OS隔离。
 
 ## 后续里程碑

@@ -223,23 +223,42 @@ def compare(before, after):
     if before["response"]["status"] != after["response"]["status"]:
         violations.append("HTTP status changed")
     def visit(old, new, path):
+        issues, unknown = [], []
         if old["type"] != new["type"]:
-            violations.append(f"{path}: observed type changed")
+            issues.append(f"{path}: observed type changed")
         elif old["type"] == "object":
             for key, value in old["properties"].items():
+                child = path + "/" + key.replace("~", "~0").replace("/", "~1")
                 if key not in new["properties"]:
-                    violations.append(f"{path}/{key}: observed field disappeared")
+                    issues.append(f"{child}: observed field disappeared")
                 else:
-                    visit(value, new["properties"][key], f"{path}/{key}")
-        elif old["type"] == "array" and old["items"] and new["items"]:
+                    nested_issues, nested_unknown = visit(value, new["properties"][key], child)
+                    issues.extend(nested_issues)
+                    unknown.extend(nested_unknown)
+        elif old["type"] == "array":
+            if bool(old["items"]) != bool(new["items"]):
+                unknown.append(f"{path}: empty sample cannot establish array item compatibility")
             for item in new["items"]:
+                if not old["items"]:
+                    continue
                 compatible = [prior for prior in old["items"] if prior["type"] == item["type"]]
                 if not compatible:
-                    violations.append(f"{path}/*: new observed item type")
-                elif len(compatible) == 1:
-                    visit(compatible[0], item, path + "/*")
-    visit(before["response"]["schema"], after["response"]["schema"], "$response")
+                    issues.append(f"{path}/*: new observed item type")
+                    continue
+                choices = [visit(prior, item, path + "/*") for prior in compatible]
+                valid = [choice for choice in choices if not choice[0]]
+                if not valid:
+                    issues.append(f"{path}/*: no compatible observed item shape")
+                else:
+                    # Prefer fully evidenced shape over uncertain array variants.
+                    best = min(valid, key=lambda choice: len(choice[1]))
+                    unknown.extend(best[1])
+        return issues, unknown
+    issues, uncertainties = visit(before["response"]["schema"], after["response"]["schema"], "$response")
+    violations.extend(issues)
     return {"version": 1, "passed": not violations, "violations": violations,
+            "uncertainties": sorted(set(uncertainties)),
+            "compatible": False if violations else None if uncertainties else True,
             "scope": "observed-sample-drift-not-full-api-proof"}
 
 

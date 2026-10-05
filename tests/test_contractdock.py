@@ -79,6 +79,18 @@ class ContractTests(unittest.TestCase):
         self.assertFalse(compare(fixture([1, 2]), fixture(["name"]))["passed"])
         self.assertTrue(compare(fixture([]), fixture(["name"]))["passed"])
 
+    def test_multiple_observed_object_shapes_cannot_hide_breaking_drift(self):
+        before = fixture([{ "id": 1 }, { "name": "mage" }])
+        after = fixture([{ "removed_every_old_field": True }])
+        self.assertFalse(compare(before, after)["passed"])
+        self.assertTrue(compare(before, fixture([{ "id": 2, "extra": "allowed" }]))["passed"])
+
+    def test_empty_array_reports_uncertainty_instead_of_proof(self):
+        report = compare(fixture([]), fixture([{"id": 1}]))
+        self.assertTrue(report["passed"])
+        self.assertIsNone(report["compatible"])
+        self.assertTrue(report["uncertainties"])
+
     def test_fixture_roundtrip_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "fixture.json"
