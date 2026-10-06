@@ -67,9 +67,28 @@ contractdock scenario scenario.json --port 8099
 
 可复现回放/场景并发基准：`python -m benchmarks.replay --requests 256 --workers 4`。它校验所有HTTP响应及场景响应数量，不将错误请求计为吞吐；实测与冷启动/顺序/内存测量限制见 [方法说明](benchmarks/README.md)。不是生产负载或场景比固定回放更快的证明。
 
-## 后续里程碑
+## v0.4 显式 OpenAPI 响应验收（离线、有限子集）
 
-1. OpenAPI导入、optional/union schema和请求响应双向兼容定义。
+```sh
+python examples/openapi_response.py
+contractdock openapi-check openapi.json fixture.json --method GET --path /players
+```
+
+仅读取显式选择的本地 UTF-8 JSON OpenAPI **3.0.x** 和既有校验通过的脱敏fixture；不录制、不访问网络、不创建输出文件。Python API：`contractdock.core.check_openapi_response(document, packet, method='GET', path='/players')`。GET/POST和literal路径必须明确指定（不支持`{id}`模板，query不参与operation选择）；精确状态优先，其次`default`。未声明状态、fixture method/path错配或响应不符合schema返回完整失败报告/退出码1；通过为0；格式、不支持的约束、预算超限为2/`complete:false`，不返回部分成功。
+
+支持`string/integer/number/boolean/object/array`、`{}`无约束schema、object `required`/可选`properties`、`additionalProperties`（默认true，可为bool/schema）、array `items`、有明确type的`nullable`、最多256个标量`enum`、`anyOf`和**恰好一个**分支通过的`oneOf`、独立`#/components/schemas/NAME`本地引用（JSON Pointer `~0/~1`转义）。integer接受有限整数float（1.0），bool不算number/integer，enum的True和1不同而1和1.0相同。重复枚举拒绝。循环/远程/文件引用、ref siblings拒绝，不拉取任何引用。
+
+`title/description/example/deprecated`仅作为不影响验收的元数据忽略。其他schema约束（如format、pattern、minimum、长度、allOf、discriminator、readOnly/writeOnly、混合union siblings）均拒绝，不静默放过。选定operation的**全部响应**必须有inline `application/json` schema且都完成编译；即使fixture是200，不支持的500 schema也使验收失败。其他operation不导入，替代media type/headers/links不验证；缺JSON schema的无body204也不支持。只证明该fixture的脱敏body符合选定JSON schema，不是整个文档规范合规。
+
+完整文档/fixture各最多1MiB，Python API拒绝非JSON类型/非字符串key并先分离输入；JSON输入遍历最多100,000节点/64层，schema展开合计最多1,024节点/32层，每union最多16分支。运行时所有分支/数组/对象/枚举共享100,000次评估预算，耗尽抛ContractError，不输出partial pass。预算防止无限展开，不是恶意输入的进程级CPU/RSS隔离；CLI读文件仍需使用可信本地路径，普通文件预检不宣称抵御本地文件替换竞争。
+
+报告仅含固定scope/violations、status及document/fixture/operation规范SHA256，不包含schema字段名、枚举、path、响应值。哈希是完整性标识，不是签名或秘密隐藏承诺（低熵值可被猜测）。既有fixture hash/schema/脱敏规则先验证；**敏感字段替换成`[REDACTED]`会改变类型/枚举，失败不必然表示原始网络响应不合规**。`request_validated:false`和`full_openapi_validated:false`明确未验证请求body/参数/auth、业务语义、全响应覆盖或请求响应双向兼容。旧`compare`的样例漂移语义保持不变。
+
+22项新验收包含节点/深度/union/重复ref/runtime/字节上限、标量类型、输入detachment、离线ref、status/default、脱敏hash、真实CLI0/1/2及版本一致；全67项source回归。Windows/Linux CI还从源码外安装0.4.0 wheel重复22项OpenAPI与9项旧HTTP故障测试及合成demo，无真实API或私人fixture。
+
+## 后续里程碑（仍未全完成）
+
+1. 已实现选定OpenAPI3.0 JSON响应子集及optional/union；剩余请求验证、完整OpenAPI约束/媒体、请求响应双向兼容定义。
 2. 可配置字段脱敏、fixture隐私审计和审批。
 3. 显式本地代理录制，安全受控header输入（绝不落盘）。
 4. 在全局顺序场景基础上增加显式每用户session、分支/分页和受控断连模拟。

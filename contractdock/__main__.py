@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 from .core import ContractError, compare, load_fixture, parse_json, record, replay_server, write_fixture
 from .scenario import load_scenario, scenario_server
+from .openapi import check_response, load_document
 
 
 def main(argv=None):
@@ -24,8 +25,18 @@ def main(argv=None):
     command = sub.add_parser("scenario", help="Serve a globally ordered offline response sequence")
     command.add_argument("description", type=Path)
     command.add_argument("--port", type=int, default=8099)
+    command = sub.add_parser('openapi-check', help='Offline selected OpenAPI 3.0 JSON response acceptance')
+    command.add_argument('document', type=Path)
+    command.add_argument('fixture', type=Path)
+    command.add_argument('--method', required=True, choices=['GET', 'POST'])
+    command.add_argument('--path', required=True)
     args = parser.parse_args(argv)
     try:
+        if args.action == 'openapi-check':
+            report = check_response(load_document(args.document), load_fixture(args.fixture),
+                                    method=args.method, path=args.path)
+            print(json.dumps(report))
+            return 0 if report['passed'] else 1
         if args.action == "record":
             body = None
             if args.body_file:
@@ -50,7 +61,8 @@ def main(argv=None):
                 pass
         return 0
     except (ContractError, OSError, ValueError) as exc:
-        print(json.dumps({"complete": False, "error": str(exc)}))
+        error = 'Invalid, unsupported or over-budget local OpenAPI/fixture input' if args.action == 'openapi-check' else str(exc)
+        print(json.dumps({"complete": False, "error": error}))
         return 2
 
 

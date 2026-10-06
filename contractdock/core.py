@@ -20,6 +20,12 @@ class ContractError(Exception):
     """Unsafe recording, malformed fixture or request mismatch."""
 
 
+def check_openapi_response(document, packet, *, method, path):
+    """Offline selected response-schema acceptance, not API compatibility proof."""
+    from .openapi import check_response
+    return check_response(document, packet, method=method, path=path)
+
+
 MAX_BYTES = 1024 * 1024
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|authorization|cookie|api.?key|credential)")
 

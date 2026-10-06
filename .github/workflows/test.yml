@@ -17,6 +17,7 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python examples/demo.py
       - run: python examples/retry_scenario.py
+      - run: python examples/openapi_response.py
       - run: python -m compileall -q contractdock tests examples tools
       - run: python -m pip wheel --no-deps --wheel-dir dist .
       - name: Installed CLI

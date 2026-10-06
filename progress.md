@@ -1,5 +1,10 @@
 # Verified progress
 
+## 2026-10-07 v0.4 selected offline OpenAPI response acceptance
+First12 new methods produced1 CLI failure/34 API errors (subcases included) because the API/subcommand did not exist. Implemented explicit GET/POST literal-path selection, exact/default response status, required/optional/nullable/scalar enum/additional properties/arrays/anyOf/exactly-one oneOf and local schema refs. All selected response schemas compile; unsupported constraints/refs/cycles fail closed, other operations and alternate media are explicitly outside scope. Expanded22 methods pass targeted acceptance including1024 node/32 depth/16 branches/100000 evaluation budgets,1MiB JSON, input detachment, type-aware enums, fixture integrity, sanitized metadata-only reports and actual CLI0/1/2. API reports request_validated=false/full_openapi_validated=false; this checks stored redacted body, not original network or API-wide compatibility.
+
+Aligned previously inconsistent package0.3.0/metadata0.3.1 to0.4.0. Final full regression, installed-wheel and exact SHA/CI evidence are maintained in external portfolio report; no documentation-only publication evidence commit. No live APIs/private fixtures/paid models/production services touched. Next: complete request/response compatibility semantics or privacy audit, not claiming full OpenAPI validation or malicious-process resource isolation.
+
 ## 2026-10-06 v0.3.1 HTTP framing and publication faults
 New9 synthetic/real-loopback acceptance tests first produced11 failures and2 errors (including framing subtests): short declared-length but valid JSON recorded successfully, invalid/ambiguous length and transfer framing accepted, truncated chunk HTTPException escaped CLI, empty Transfer-Encoding and absolute URL consumed scenario state. Added shared strict length validation, supported response transfer framing check, declared-byte-count check and sanitized HTTPException failure; replay rejects any TE header, GET nonzero body and absolute target before selection.
 
