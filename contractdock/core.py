@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import copy
+from http.client import HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -127,6 +128,30 @@ def _origin(url):
         raise ContractError("Invalid URL") from exc
 
 
+def _content_length(headers):
+    """Reject ambiguous/invalid framing before integer conversion or reading."""
+    values = headers.get_all("Content-Length")
+    if values is None:
+        return None
+    if len(values) != 1:
+        raise ContractError("Invalid Content-Length")
+    value = values[0].strip()
+    if len(value) > 10 or not value.isascii() or not value.isdigit():
+        raise ContractError("Invalid Content-Length")
+    return int(value)
+
+
+def _response_length(headers):
+    length = _content_length(headers)
+    transfer = headers.get_all("Transfer-Encoding")
+    if transfer is not None:
+        if length is not None or len(transfer) != 1 or transfer[0].strip().lower() != "chunked":
+            raise ContractError("Unsupported or ambiguous response framing")
+    if length is not None and length > MAX_BYTES:
+        raise ContractError("Response exceeds 1 MiB")
+    return length
+
+
 def record(url: str, *, allowed_origins, method="GET", body=None, timeout=5):
     """One explicitly requested network call, no redirects, proxies or headers saved."""
     if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 60:
@@ -153,13 +178,16 @@ def record(url: str, *, allowed_origins, method="GET", body=None, timeout=5):
             content_type = response.headers.get_content_type()
             if content_type != "application/json" and not content_type.endswith("+json"):
                 raise ContractError("Only JSON responses can be recorded")
+            expected = _response_length(response.headers)
             content = response.read(MAX_BYTES + 1)
+            if expected is not None and len(content) != expected:
+                raise ContractError("Incomplete JSON response")
             value = redact(parse_json(content))
             packet = {"version": 1, "request": request,
                       "response": {"status": response.status, "body": value, "schema": schema(value)}}
             packet["sha256"] = hashlib.sha256(canonical(packet)).hexdigest()
             return packet
-    except (URLError, OSError, ValueError) as exc:
+    except (URLError, OSError, ValueError, HTTPException) as exc:
         # Do not include upstream errors/URL/query or response body in failure text.
         raise ContractError("Recording network operation failed") from exc
 
@@ -299,12 +327,14 @@ def _replay_server(select, *, port=0):
         def handle_request(self):
             self.connection.settimeout(5)
             try:
-                if self.headers.get("Transfer-Encoding"):
+                if self.headers.get_all("Transfer-Encoding") is not None:
                     raise ContractError("Streaming requests unsupported")
-                lengths = self.headers.get_all("Content-Length") or ["0"]
-                if len(lengths) != 1 or len(lengths[0]) > 10 or not lengths[0].isascii() or not lengths[0].isdigit():
-                    raise ContractError("Invalid Content-Length")
-                length = int(lengths[0])
+                length = _content_length(self.headers)
+                length = 0 if length is None else length
+                if self.command == "GET" and length:
+                    raise ContractError("GET body is not supported")
+                if not self.path.startswith("/") or urlsplit(self.path).netloc:
+                    raise ContractError("Offline request needs a relative path")
                 if length > MAX_BYTES:
                     self.send_json(413, {"error": "request too large"})
                     return

@@ -57,9 +57,17 @@ contractdock scenario scenario.json --port 8099
 
 示例完全使用合成脱敏fixtures，实际通过本地HTTP请求观察 `[503,503,200]` 重试恢复、错序409和结束410。适合可重复测试“暂时不可用→恢复”，不意味着真实后端故障统计或生产负载模型。现有固定回放同样复制已验证fixture，避免调用者在启动后改响应绕过完整性检查。
 
-## 后续里程碑
+## v0.3.1 HTTP完整性与故障验收
+
+录制拒绝重复、非数字、负值、超界Content-Length，拒绝不支持的Transfer-Encoding（仅单个chunked）及同时携带TE/长度的歧义响应。声明长度与实际读取bytes不一致即失败；chunk截断/HTTP协议错误转为不含URL、query或响应内容的CLI退出码2/complete:false，不发布fixture。正常完整chunked、确切长度及无长度以连接关闭结尾的JSON保持支持；没有长度的响应无法证明服务端原本打算发送更多数据。
+
+离线回放/场景在匹配前拒绝所有Transfer-Encoding头（包括空值）、GET非零body及绝对URL请求目标；畸形输入400，不消耗步骤。场景匹配成功后断连仍按既有规则消耗，不自动回退。固定回放也使用同一传输验证。
+
+新增9项真实loopback/合成发布故障测试，总45tests：先在旧实现复现短JSON误录、chunk错误逃逸与场景提前消耗，再验证合法framing、fsync失败无输出、并发发布不覆盖完整竞争fixture。CI在Windows/Linux安装wheel后从源码外重复全部9项故障验收。仍是可信URL的本地开发工具，不是完整HTTP代理、请求走私/SSRF防御产品或生产服务器；不保证全程绝对超时、恶意流量资源隔离和断电目录持久性。
 
 可复现回放/场景并发基准：`python -m benchmarks.replay --requests 256 --workers 4`。它校验所有HTTP响应及场景响应数量，不将错误请求计为吞吐；实测与冷启动/顺序/内存测量限制见 [方法说明](benchmarks/README.md)。不是生产负载或场景比固定回放更快的证明。
+
+## 后续里程碑
 
 1. OpenAPI导入、optional/union schema和请求响应双向兼容定义。
 2. 可配置字段脱敏、fixture隐私审计和审批。

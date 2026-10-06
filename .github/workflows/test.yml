@@ -17,7 +17,7 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python examples/demo.py
       - run: python examples/retry_scenario.py
-      - run: python -m compileall -q contractdock tests examples
+      - run: python -m compileall -q contractdock tests examples tools
       - run: python -m pip wheel --no-deps --wheel-dir dist .
       - name: Installed CLI
         shell: bash
@@ -26,3 +26,5 @@ jobs:
           cd "$RUNNER_TEMP"
           contractdock --help
           python -c "import contractdock; assert 'site-packages' in contractdock.__file__"
+          python -I "$GITHUB_WORKSPACE/tools/verify_installed.py"
+          python -m pip check

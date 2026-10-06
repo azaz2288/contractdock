@@ -1,5 +1,10 @@
 # Verified progress
 
+## 2026-10-06 v0.3.1 HTTP framing and publication faults
+New9 synthetic/real-loopback acceptance tests first produced11 failures and2 errors (including framing subtests): short declared-length but valid JSON recorded successfully, invalid/ambiguous length and transfer framing accepted, truncated chunk HTTPException escaped CLI, empty Transfer-Encoding and absolute URL consumed scenario state. Added shared strict length validation, supported response transfer framing check, declared-byte-count check and sanitized HTTPException failure; replay rejects any TE header, GET nonzero body and absolute target before selection.
+
+Normal complete chunked, EOF-delimited and exact-length JSON recording remain supported. Fixture fsync-error and competing-output publication tests already passed the original implementation; they are additional acceptance evidence rather than new product fixes. No live API/private fixture/paid service used. Full45source tests, upstream-shutdown/offline and retry-scenario demos, compile/diff, independent temporary installed0.3.1 wheel9fault tests/source-external site-packages verification, CLI and pip check passed locally. Final wheel/SHA/CI evidence is recorded in external maintenance report after publication. Next: OpenAPI/optional unions and privacy audit remain unfinished; this stage does not implement those roadmap features or claim production HTTP/SSRF/power-loss guarantees.
+
 ## 2026-10-06 v0.1
 19 tests, real upstream-shutdown/offline-replay demo, wheel installation and installed CLI passed. Published 9989170cfbec800f9ef5fc6ba63e5a3087145d9d, matching Windows/Linux CI success. Explicit origin, no redirect/proxy, redacted JSON fixtures, fixed offline matching, immutable output publication. Default redaction is not comprehensive privacy assurance.
 
